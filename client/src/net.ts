@@ -47,5 +47,15 @@ export function connectNet(url: string) {
     ws.send(JSON.stringify({ type: "input", id, input }));
   }
 
-  return { net, sendInput };
+  function sendJoin(id: string, username: string, cls: string) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "join", id, username, cls }));
+  }
+
+  function sendAttack(id: string) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "attack", id }));
+  }
+
+  return { net, sendInput, sendJoin, sendAttack };
 }

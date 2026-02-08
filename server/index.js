@@ -30,20 +30,49 @@ const spiders = new Map();
 
 const SPIDER_COUNT = 10;
 const SPIDER_SPEED = 120; // units/sec
-const SPIDER_R = 14;
+// spiders are larger now
+const SPIDER_R = 14 * 4;
+const SPIDER_BASE_HP = 200;
 const AGGRO_RADIUS = 350;
+
+// Player class stats: health, defense (flat), damage (for future use)
+const CLASS_STATS = {
+  cricket: { health: 90, defense: 2, damage: 8 },
+  beetle: { health: 140, defense: 6, damage: 10 },
+  firefly: { health: 80, defense: 1, damage: 6 },
+  ladybug: { health: 110, defense: 3, damage: 9 }
+};
 
 // Leaves / XP
 const LEAF_COUNT = 80;
-const LEAF_R = 8;
-const XP_PER_LEAF = 10;
+const LEAF_R = 12;
+
+// Different leaf rarities/types with varying XP rewards
+const LEAF_TYPES = [
+  { type: "yellow", xp: 5, weight: 60 },
+  { type: "orange", xp: 12, weight: 30 },
+  { type: "red", xp: 25, weight: 10 }
+];
+
+function chooseLeafType() {
+  const total = LEAF_TYPES.reduce((s, t) => s + t.weight, 0);
+  let r = Math.random() * total;
+  for (const t of LEAF_TYPES) {
+    if (r < t.weight) return t;
+    r -= t.weight;
+  }
+  return LEAF_TYPES[0];
+}
 
 function makeLeaf(id) {
+  const spec = chooseLeafType();
   return {
     id,
     x: rand(50, WORLD.w - 50),
     y: rand(50, WORLD.h - 50),
-    r: LEAF_R
+    r: LEAF_R,
+    type: spec.type,
+    xp: spec.xp
   };
 }
 
@@ -68,6 +97,8 @@ function makeSpider(id) {
     vx: 0,
     vy: 0,
     r: SPIDER_R,
+    hp: SPIDER_BASE_HP,
+    maxHp: SPIDER_BASE_HP,
     // simple wander state
     wanderDir: { x: Math.cos(Math.random() * Math.PI * 2), y: Math.sin(Math.random() * Math.PI * 2) },
     wanderTimer: Math.floor(Math.random() * 60)
@@ -97,12 +128,14 @@ function makePlayer(id) {
     // cosmetic for now
     color: ["#6cc644", "#ff6b6b", "#ffd93d", "#4dabf7"][Math.floor(Math.random() * 4)],
     r: 18,
+    facing: 0,
     // combat
     hp: MAX_HP,
     maxHp: MAX_HP,
     alive: true,
     invuln: 0,
     respawnTimer: 0,
+    attackCooldown: 0,
     // progression
     xp: 0,
     level: 1
@@ -225,6 +258,77 @@ wss.on("connection", (ws) => {
         left: !!inp.left,
         right: !!inp.right
       };
+      // facing angle if provided
+      if (typeof inp.facing === "number" && Number.isFinite(inp.facing)) {
+        p.facing = inp.facing;
+      }
+    }
+
+    // Client sets username / class
+    if (msg.type === "join" && typeof msg.id === "string") {
+      const p = players.get(msg.id);
+      if (!p) return;
+      // sanitize
+      const name = typeof msg.username === "string" ? msg.username.substring(0, 20) : "";
+      const cls = typeof msg.cls === "string" ? msg.cls : "";
+      p.name = name;
+      p.cls = cls;
+      // apply class stats if known
+      const stats = CLASS_STATS[cls] || null;
+      if (stats) {
+        p.maxHp = stats.health;
+        p.hp = stats.health;
+        p.defense = stats.defense;
+        p.damage = stats.damage;
+        // double player size for class sprite
+        p.r = (p.r || 18) * 2;
+      }
+    }
+
+    // Client attack request
+    if (msg.type === "attack" && typeof msg.id === "string") {
+      const p = players.get(msg.id);
+      if (!p || !p.alive) return;
+      // cooldown enforcement
+      if (p.attackCooldown && p.attackCooldown > 0) return;
+      // configure attack
+      const ATTACK_RANGE = SPIDER_R * 1.8; // larger than spider radius
+      const ATTACK_DAMAGE = 25; // fixed damage for mouse/left-click attacks
+      // mark cooldown (ticks)
+      const ATTACK_COOLDOWN_TICKS = Math.floor(0.6 * TICK_HZ);
+      p.attackCooldown = ATTACK_COOLDOWN_TICKS;
+
+      // directional arc check: only spiders within a cone centered on p.facing are hit
+      const ANGLE_ARC = Math.PI / 3; // 60 degrees cone
+
+      // find spiders in range and apply damage
+      for (const s of spiders.values()) {
+        const dx = s.x - p.x;
+        const dy = s.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= ATTACK_RANGE + s.r) {
+          // compute angle to spider and compare to player's facing
+          const angToSpider = Math.atan2(dy, dx);
+          // normalize angle difference to [-PI,PI]
+          let diff = angToSpider - (p.facing || 0);
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          if (Math.abs(diff) > ANGLE_ARC / 2) continue; // outside cone
+          s.hp -= ATTACK_DAMAGE;
+          if (s.hp <= 0) {
+            // reward player XP
+            p.xp = (p.xp || 0) + 100;
+            p.level = computeLevel(p.xp);
+            // respawn spider at new location with full health
+            s.x = rand(200, WORLD.w - 200);
+            s.y = rand(200, WORLD.h - 200);
+            s.vx = 0;
+            s.vy = 0;
+            s.hp = s.maxHp;
+            s.wanderTimer = Math.floor(Math.random() * 60);
+          }
+        }
+      }
     }
   });
 
@@ -238,6 +342,7 @@ setInterval(() => {
   for (const p of players.values()) {
     // update invulnerability timer
     if (p.invuln > 0) p.invuln -= 1;
+    if (p.attackCooldown > 0) p.attackCooldown -= 1;
 
     // handle death / respawn timers
     if (!p.alive) {
@@ -270,7 +375,8 @@ setInterval(() => {
       const d = Math.hypot(dx, dy);
       if (d > 0 && d < p.r + leaf.r) {
         // collect
-        p.xp = (p.xp || 0) + XP_PER_LEAF;
+        const gain = (leaf.xp || 0);
+        p.xp = (p.xp || 0) + gain;
         p.level = computeLevel(p.xp);
         // remove and respawn leaf at new location
         leaves.delete(lid);
@@ -291,7 +397,10 @@ setInterval(() => {
       if (d > 0 && d < p.r + s.r + 2) {
         // apply damage if not invulnerable
         if (!p.invuln || p.invuln <= 0) {
-          p.hp -= SPIDER_DAMAGE;
+          // account for player defense (flat reduction)
+          const def = p.defense || 0;
+          const dmg = Math.max(1, SPIDER_DAMAGE - def);
+          p.hp -= dmg;
           p.invuln = INVULN_TICKS;
           // kill
           if (p.hp <= 0) {
@@ -334,8 +443,15 @@ setInterval(() => {
       maxHp: p.maxHp,
       alive: !!p.alive,
       respawnTimer: p.respawnTimer, // ticks remaining
+      invuln: p.invuln || 0,
+      attackCooldown: p.attackCooldown || 0,
+      defense: p.defense || 0,
+      damage: p.damage || 0,
+      name: p.name || null,
+      cls: p.cls || null,
       xp: p.xp || 0,
-      level: p.level || 1
+      level: p.level || 1,
+      facing: p.facing || 0
     })),
     spiders: Array.from(spiders.values()).map((s) => ({
       id: s.id,
@@ -343,9 +459,11 @@ setInterval(() => {
       y: s.y,
       vx: s.vx,
       vy: s.vy,
-      r: s.r
+      r: s.r,
+      hp: s.hp,
+      maxHp: s.maxHp
     })),
-    leaves: Array.from(leaves.values()).map((l) => ({ id: l.id, x: l.x, y: l.y, r: l.r }))
+    leaves: Array.from(leaves.values()).map((l) => ({ id: l.id, x: l.x, y: l.y, r: l.r, type: l.type, xp: l.xp }))
   };
   broadcast(snapshot);
 }, 1000 / SNAPSHOT_HZ);

@@ -14,6 +14,11 @@ export type PlayerSnapshot = {
   respawnTimer?: number; // ticks remaining
   xp?: number;
   level?: number;
+  name?: string | null;
+  cls?: string | null;
+  facing?: number;
+  defense?: number;
+  damage?: number;
 };
 
 export type SnapshotMsg = {
@@ -37,6 +42,7 @@ export type InputState = {
   down: boolean;
   left: boolean;
   right: boolean;
+  facing?: number;
 };
 
 export type Spider = {
@@ -47,6 +53,8 @@ export type Spider = {
   vy: number;
   r: number;
   color?: string;
+  hp?: number;
+  maxHp?: number;
 };
 
 export type Leaf = {
@@ -54,4 +62,6 @@ export type Leaf = {
   x: number;
   y: number;
   r: number;
+  type?: "yellow" | "orange" | "red";
+  xp?: number;
 };

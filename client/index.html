@@ -13,11 +13,65 @@
         font-size: 14px; background: rgba(0,0,0,0.35);
         padding: 10px 12px; border-radius: 10px;
       }
+
+      /* Join screen */
+      .join-screen {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(180deg, rgba(4,8,12,0.6), rgba(4,8,12,0.85));
+        z-index: 40; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .join-card {
+        width: 760px; max-width: calc(100vw - 48px); background: rgba(255,255,255,0.04);
+        border-radius: 12px; padding: 24px; color: #e6edf3; box-shadow: 0 6px 30px rgba(0,0,0,0.6);
+      }
+      .join-card h1 { margin: 0 0 8px 0; font-size: 20px; }
+      .username-input { width: 100%; padding: 12px 14px; border-radius: 8px; border: none; font-size: 16px; }
+      .class-grid { display:flex; gap: 12px; margin-top: 16px; }
+      .class-card { flex: 1; background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px; text-align:center; cursor:pointer; transition: transform .12s ease, box-shadow .12s ease; }
+      .class-card:hover { transform: translateY(-6px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+      .class-card.selected { outline: 2px solid #ffd166; box-shadow: 0 10px 30px rgba(255,193,7,0.08); }
+      .class-card img { max-width: 100%; height: 96px; object-fit: contain; }
+      .class-label { margin-top: 8px; font-weight: 600; }
+      .confirm-row { margin-top: 16px; display:flex; justify-content:center; }
+      .confirm-btn { background: #57b86a; color: #fff; border: none; padding: 12px 18px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+      .confirm-btn:disabled { opacity: 0.5; cursor: default; }
     </style>
   </head>
   <body>
     <canvas id="game"></canvas>
     <div class="hud" id="hud">Connecting...</div>
+
+    <div id="join-screen" class="join-screen">
+      <div class="join-card">
+        <h1>Join RolyPolytumble</h1>
+        <p style="margin-top:0; color:#bfc9d6;">Enter a username and choose your bug class.</p>
+        <input id="username" class="username-input" placeholder="Enter username" maxlength="20" />
+
+        <div class="class-grid" style="margin-top:18px;">
+          <div class="class-card" data-class="cricket">
+            <img src="/assets/cricket_sprite_v1.png" alt="Cricket" />
+            <div class="class-label">Cricket</div>
+          </div>
+          <div class="class-card" data-class="beetle">
+            <img src="/assets/beetle_v1.png" alt="Beetle" />
+            <div class="class-label">Beetle</div>
+          </div>
+          <div class="class-card" data-class="firefly">
+            <img src="/assets/firefly_v1.png" alt="Firefly" />
+            <div class="class-label">Firefly</div>
+          </div>
+          <div class="class-card" data-class="ladybug">
+            <img src="/assets/ladybug_v1.png" alt="Ladybug" />
+            <div class="class-label">Ladybug</div>
+          </div>
+        </div>
+
+        <div class="confirm-row">
+          <button id="confirm-btn" class="confirm-btn" disabled>Begin Round</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
