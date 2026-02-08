@@ -8,12 +8,20 @@ export type PlayerSnapshot = {
   vy: number;
   r: number;
   color: string;
+  hp?: number;
+  maxHp?: number;
+  alive?: boolean;
+  respawnTimer?: number; // ticks remaining
+  xp?: number;
+  level?: number;
 };
 
 export type SnapshotMsg = {
   type: "snapshot";
   t: number;
   players: PlayerSnapshot[];
+  spiders?: Spider[];
+  leaves?: Leaf[];
 };
 
 export type WelcomeMsg = {
@@ -29,4 +37,21 @@ export type InputState = {
   down: boolean;
   left: boolean;
   right: boolean;
+};
+
+export type Spider = {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  r: number;
+  color?: string;
+};
+
+export type Leaf = {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
 };

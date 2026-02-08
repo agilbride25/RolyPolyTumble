@@ -40,7 +40,9 @@ function loop() {
     canvas,
     world,
     meId: net.id,
-    players: net.latestSnapshot.players
+    players: net.latestSnapshot.players,
+    spiders: net.latestSnapshot.spiders || [],
+    leaves: net.latestSnapshot.leaves || []
   });
 
   requestAnimationFrame(loop);
